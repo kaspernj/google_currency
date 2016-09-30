@@ -94,9 +94,15 @@ class Money
       # @example
       #   @bank = GoogleCurrency.new  #=> <Money::Bank::GoogleCurrency...>
       #   @bank.get_rate(:USD, :EUR)  #=> 0.776337241
-      def get_rate(from, to)
+      def get_rate(from, to, args = {})
         expire_rates
-        store.get_rate(from, to) || store.add_rate(from, to, fetch_rate(from, to))
+
+        if args[:exchanged_at]
+          fetch_rate(from, to, exchanged_at: args.fetch(:exchanged_at))
+          raise "stub"
+        else
+          store.get_rate(from, to) || store.add_rate(from, to, fetch_rate(from, to))
+        end
       end
 
       ##
@@ -122,19 +128,14 @@ class Money
       # @param [String, Symbol, Currency] to Currency to convert to
       #
       # @return [BigDecimal] The requested rate.
-      def fetch_rate(from, to)
+      def fetch_rate(from, to, args = {})
+        from = Currency.wrap(from)
+        to = Currency.wrap(to)
 
-        from, to = Currency.wrap(from), Currency.wrap(to)
-
-        data = build_uri(from, to).read
-        rate = extract_rate(data);
-
-        if (rate < 0.1)
-          rate = 1/extract_rate(build_uri(to, from).read)
-        end
-
+        data = build_uri(from, to, args).read
+        rate = extract_rate(data)
+        rate = 1 / extract_rate(build_uri(to, from).read) if rate < 0.1
         rate
-
       end
 
       ##
@@ -144,12 +145,16 @@ class Money
       # @param [Currency] to The currency to convert to.
       #
       # @return [URI::HTTP]
-      def build_uri(from, to)
+      def build_uri(from, to, args = {})
         uri = URI::HTTP.build(
           :host  => SERVICE_HOST,
           :path  => SERVICE_PATH,
           :query => "a=1&from=#{from.iso_code}&to=#{to.iso_code}"
         )
+
+        puts "URI: #{uri}"
+
+        uri
       end
 
       ##
